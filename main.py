@@ -1,293 +1,1091 @@
-import os
+import pygame
 import pyttsx3
+import requests
+import threading
+import random
+import sys
 
-engine = pyttsx3.init()
+pygame.init()
 
-def limpiar_pantalla():
-    os.system('cls' if os.name == 'nt' else 'clear')
+# =====================================
+# CONFIG
+# =====================================
 
-def hablar(texto, lang):
-    voices = engine.getProperty('voices')
+WIDTH = 1200
+HEIGHT = 700
 
-    if lang == "es":
-        for voice in voices:
-            if "spanish" in voice.name.lower() or "es" in voice.id.lower():
-                engine.setProperty('voice', voice.id)
-                break
-    else:
-        for voice in voices:
-            if "english" in voice.name.lower() or "en" in voice.id.lower():
-                engine.setProperty('voice', voice.id)
-                break
+SCREEN = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("You VS Teacher")
 
-    engine.say(texto)
-    engine.runAndWait()
+CLOCK = pygame.time.Clock()
 
-BANCO_PREGUNTAS = {
-    "math": [
+FONT_BIG = pygame.font.SysFont("arial", 48)
+FONT = pygame.font.SysFont("arial", 32)
+FONT_SMALL = pygame.font.SysFont("arial", 24)
+
+WHITE = (255,255,255)
+BLACK = (20,20,20)
+GRAY = (50,50,50)
+LIGHT_GRAY = (90,90,90)
+GREEN = (50,180,80)
+RED = (220,60,60)
+BLUE = (50,120,220)
+
+API_GET = "https://jsonplaceholder.typicode.com/todos/1"
+API_POST = "https://jsonplaceholder.typicode.com/posts"
+
+# =====================================
+# TEXTS
+# =====================================
+
+TEXTS = {
+
+    "es": {
+
+        "title": "Tú VS Profesor",
+
+        "play": "Jugar",
+
+        "settings": "Configuración",
+
+        "stats": "Estadísticas",
+
+        "quit": "Salir",
+
+        "language": "Idioma",
+
+        "blind": "Modo Ciego",
+
+        "back": "Volver",
+
+        "math": "Matemáticas",
+
+        "geo": "Geografía",
+
+        "english": "Inglés",
+
+        "correct": "Correcto",
+
+        "wrong": "Incorrecto",
+
+        "score": "Puntuación",
+
+        "choose": "Elige una respuesta",
+
+        "finalscore": "Puntuación Final",
+
+        "send": "Enviar Resultado"
+
+    },
+
+    "en": {
+
+        "title": "You VS Teacher",
+
+        "play": "Play",
+
+        "settings": "Settings",
+
+        "stats": "Statistics",
+
+        "quit": "Quit",
+
+        "language": "Language",
+
+        "blind": "Blind Mode",
+
+        "back": "Back",
+
+        "math": "Math",
+
+        "geo": "Geography",
+
+        "english": "English",
+
+        "correct": "Correct",
+
+        "wrong": "Wrong",
+
+        "score": "Score",
+
+        "choose": "Choose an answer",
+
+        "finalscore": "Final Score",
+
+        "send": "Send Score"
+
+    }
+}
+
+# =====================================
+# QUESTIONS
+# =====================================
+
+QUESTIONS = {
+
+    "math":[
+
         {
-            "en": {"q": "What is 7 * 8?", "a": "56", "b": "64", "c": "48", "d": "54"},
-            "es": {"q": "¿Cuánto es 7 * 8?", "a": "56", "b": "64", "c": "48", "d": "54"}
+            "correct":"A",
+
+            "es":{
+                "q":"¿Cuánto es 7 x 8?",
+                "A":"56",
+                "B":"64",
+                "C":"72",
+                "D":"54"
+            },
+
+            "en":{
+                "q":"What is 7 x 8?",
+                "A":"56",
+                "B":"64",
+                "C":"72",
+                "D":"54"
+            }
         },
+
         {
-            "en": {"q": "Solve: 15 - (3 * 4)", "a": "3", "b": "12", "c": "48", "d": "6"},
-            "es": {"q": "Resuelve: 15 - (3 * 4)", "a": "3", "b": "12", "c": "48", "d": "6"}
+            "correct":"D",
+
+            "es":{
+                "q":"¿Cuánto es 25 / 5?",
+                "A":"4",
+                "B":"6",
+                "C":"10",
+                "D":"5"
+            },
+
+            "en":{
+                "q":"What is 25 / 5?",
+                "A":"4",
+                "B":"6",
+                "C":"10",
+                "D":"5"
+            }
         },
+
         {
-            "en": {"q": "What is the square root of 81?", "a": "9", "b": "7", "c": "8", "d": "10"},
-            "es": {"q": "¿Cuál es la raíz cuadrada de 81?", "a": "9", "b": "7", "c": "8", "d": "10"}
-        },
-        {
-            "en": {"q": "Which number is prime?", "a": "13", "b": "4", "c": "9", "d": "15"},
-            "es": {"q": "¿Qué número es primo?", "a": "13", "b": "4", "c": "9", "d": "15"}
-        },
-        {
-            "en": {"q": "What is 120 / 4?", "a": "30", "b": "25", "c": "40", "d": "20"},
-            "es": {"q": "¿Cuánto es 120 / 4?", "a": "30", "b": "25", "c": "40", "d": "20"}
+            "correct":"B",
+
+            "es":{
+                "q":"Raíz cuadrada de 81",
+                "A":"8",
+                "B":"9",
+                "C":"10",
+                "D":"11"
+            },
+
+            "en":{
+                "q":"Square root of 81",
+                "A":"8",
+                "B":"9",
+                "C":"10",
+                "D":"11"
+            }
         }
+
     ],
-    "geography": [
+
+    "geo":[
+
         {
-            "en": {"q": "What is the capital of France?", "a": "Paris", "b": "London", "c": "Madrid", "d": "Berlin"},
-            "es": {"q": "¿Cuál es la capital de Francia?", "a": "París", "b": "Londres", "c": "Madrid", "d": "Berlín"}
+            "correct":"A",
+
+            "es":{
+                "q":"Capital de Francia",
+                "A":"París",
+                "B":"Madrid",
+                "C":"Roma",
+                "D":"Berlín"
+            },
+
+            "en":{
+                "q":"Capital of France",
+                "A":"Paris",
+                "B":"Madrid",
+                "C":"Rome",
+                "D":"Berlin"
+            }
         },
+
         {
-            "en": {"q": "Which is the largest ocean on Earth?", "a": "Pacific Ocean", "b": "Atlantic Ocean", "c": "Indian Ocean", "d": "Arctic Ocean"},
-            "es": {"q": "¿Cuál es el océano más grande de la Tierra?", "a": "Océano Pacífico", "b": "Océano Atlántico", "c": "Océano Índico", "d": "Océano Ártico"}
-        },
-        {
-            "en": {"q": "In which continent is Egypt located?", "a": "Africa", "b": "Asia", "c": "Europe", "d": "America"},
-            "es": {"q": "¿En qué continente se encuentra Egipto?", "a": "África", "b": "Asia", "c": "Europa", "d": "América"}
-        },
-        {
-            "en": {"q": "What is the longest river in the world?", "a": "Amazon River", "b": "Nile", "c": "Mississippi", "d": "Yangtze"},
-            "es": {"q": "¿Cuál es el río más largo del mundo?", "a": "Río Amazonas", "b": "Nilo", "c": "Misisipi", "d": "Yangtsé"}
-        },
-        {
-            "en": {"q": "Which country has the most population?", "a": "India", "b": "China", "c": "USA", "d": "Russia"},
-            "es": {"q": "¿Qué país tiene mayor población?", "a": "India", "b": "China", "c": "EE.UU.", "d": "Rusia"}
+            "correct":"C",
+
+            "es":{
+                "q":"Océano más grande",
+                "A":"Atlántico",
+                "B":"Índico",
+                "C":"Pacífico",
+                "D":"Ártico"
+            },
+
+            "en":{
+                "q":"Largest ocean",
+                "A":"Atlantic",
+                "B":"Indian",
+                "C":"Pacific",
+                "D":"Arctic"
+            }
         }
+
     ],
-    "english": [
+
+    "english":[
+
         {
-            "en": {"q": "What is the past tense of 'GO'?", "a": "Went", "b": "Goed", "c": "Gone", "d": "Going"},
-            "es": {"q": "¿Cuál es el pasado del verbo 'GO'?", "a": "Went", "b": "Goed", "c": "Gone", "d": "Going"}
+            "correct":"A",
+
+            "es":{
+                "q":"Pasado de GO",
+                "A":"Went",
+                "B":"Goed",
+                "C":"Gone",
+                "D":"Going"
+            },
+
+            "en":{
+                "q":"Past tense of GO",
+                "A":"Went",
+                "B":"Goed",
+                "C":"Gone",
+                "D":"Going"
+            }
         },
+
         {
-            "en": {"q": "Choose the plural of 'Child':", "a": "Children", "b": "Childs", "c": "Childrens", "d": "Childes"},
-            "es": {"q": "Elige el plural de 'Child':", "a": "Children", "b": "Childs", "c": "Childrens", "d": "Childes"}
-        },
-        {
-            "en": {"q": "Complete: She ___ a doctor.", "a": "is", "b": "are", "c": "am", "d": "be"},
-            "es": {"q": "Completa: She ___ a doctor.", "a": "is", "b": "are", "c": "am", "d": "be"}
-        },
-        {
-            "en": {"q": "What is the antonym of 'Beautiful'?", "a": "Ugly", "b": "Pretty", "c": "Smart", "d": "Short"},
-            "es": {"q": "¿Cuál es el antónimo de 'Beautiful'?", "a": "Ugly", "b": "Pretty", "c": "Smart", "d": "Short"}
-        },
-        {
-            "en": {"q": "Which word is a noun?", "a": "Table", "b": "Run", "c": "Beautifully", "d": "Under"},
-            "es": {"q": "¿Qué palabra es un sustantivo?", "a": "Table", "b": "Run", "c": "Beautifully", "d": "Under"}
+            "correct":"B",
+
+            "es":{
+                "q":"Plural de Child",
+                "A":"Childs",
+                "B":"Children",
+                "C":"Childrens",
+                "D":"Childes"
+            },
+
+            "en":{
+                "q":"Plural of Child",
+                "A":"Childs",
+                "B":"Children",
+                "C":"Childrens",
+                "D":"Childes"
+            }
         }
+
     ]
 }
 
-def mainscreen(lang):
-    limpiar_pantalla()
+# =====================================
+# TTS
+# =====================================
 
-    if lang == "en":
-        print("------ You VS Teacher ------")
-        print("- 1. Play                  -")
-        print("- 2. Settings              -")
-        print("- 3. Quit                  -")
-        print("------ -------------- ------")
+class TTS:
 
-        hablar(
-            "You VS Teacher. One, Play. Two, Settings. Three, Quit. Choose an option.",
-            lang
-        )
-        chosen = input("Choose an option: ")
-    else:
-        print("------ Tú VS Profesor ------")
-        print("- 1. Jugar                 -")
-        print("- 2. Configuración         -")
-        print("- 3. Salir                 -")
-        print("------ -------------- ------")
+    def __init__(self):
 
-        hablar(
-            "Tú contra Profesor. Uno, Jugar. Dos, Configuración. Tres, Salir. Escoge una opción.",
-            lang
-        )
-        chosen = input("Escoge una opción: ")
+        self.engine = pyttsx3.init()
+        self.enabled = False
+        self.lang = "es"
 
-    if chosen == "1":
-        return "game", lang
-    elif chosen == "2":
-        return "config", lang
-    elif chosen == "3":
-        return "quit", lang
+    def set_language(self, lang):
 
-    return "menu", lang
+        self.lang = lang
 
-def config(lang):
-    limpiar_pantalla()
+        for voice in self.engine.getProperty("voices"):
 
-    if lang == "en":
-        print("--------- Settings ---------")
-        print("- 1. Change Language       -")
-        print("- 2. Blind Mode            -")
-        print("- 3. Back                  -")
-        print("------ -------------- ------")
+            name = voice.name.lower()
+            vid = voice.id.lower()
 
-        hablar(
-            "Settings. One, Change Language. Two, Blind Mode. Three, Back. Choose an option.",
-            lang
-        )
+            if lang == "es":
 
-        chosen = input("Choose an option: ")
+                if "spanish" in name or "es" in vid:
+                    self.engine.setProperty("voice", voice.id)
+                    return
 
-        if chosen == "1":
-            hablar("Choose a language: en or es", lang)
-            new_lang = input("Choose a language (en/es): ").strip().lower()
+            else:
 
-            if new_lang in ["en", "es"]:
-                return new_lang
+                if "english" in name or "en" in vid:
+                    self.engine.setProperty("voice", voice.id)
+                    return
 
-        elif chosen == "2":
-            print("Blind mode activated.")
-            hablar("Blind mode activated.", lang)
-            input("\nPress Enter to continue...")
-    else:
-        print("------ Configuración -------")
-        print("- 1. Cambiar Idioma        -")
-        print("- 2. Modo Ciego            -")
-        print("- 3. Volver                -")
-        print("------ -------------- ------")
+    def speak(self,text):
 
-        hablar(
-            "Configuración. Uno, Cambiar Idioma. Dos, Modo Ciego. Tres, Volver. Escoge una opción.",
-            lang
+        if not self.enabled:
+            return
+
+        def run():
+
+            self.engine.say(text)
+            self.engine.runAndWait()
+
+        threading.Thread(
+            target=run,
+            daemon=True
+        ).start()
+
+tts = TTS()
+
+# =====================================
+# API
+# =====================================
+
+def get_online_stats():
+
+    try:
+
+        r = requests.get(
+            API_GET,
+            timeout=5
         )
 
-        chosen = input("Escoge una opción: ")
+        return r.json()
 
-        if chosen == "1":
-            hablar("Elige un idioma: en o es", lang)
-            new_lang = input("Elige un idioma (en/es): ").strip().lower()
+    except:
 
-            if new_lang in ["en", "es"]:
-                return new_lang
+        return {
+            "title":"Offline"
+        }
 
-        elif chosen == "2":
-            print("Modo ciego activado.")
-            hablar("Modo ciego activado.", lang)
-            input("\nPresiona Enter para continuar...")
+def post_score(score):
 
-    return lang
-
-def game(lang):
-    limpiar_pantalla()
-
-    if lang == "en":
-        print("--------- Gamemode ---------")
-        print("- 1. Math                  -")
-        print("- 2. Geography             -")
-        print("- 3. English               -")
-        print("- 4. Back                  -")
-        print("------ -------------- ------")
-
-        hablar(
-            "Gamemode. One, Math. Two, Geography. Three, English. Four, Back. Choose an option.",
-            lang
-        )
-
-        chosen = input("Choose an option: ")
-    else:
-        print("------ Modo de Juego -------")
-        print("- 1. Matemáticas           -")
-        print("- 2. Geografía             -")
-        print("- 3. Inglés                -")
-        print("- 4. Volver                -")
-        print("------ -------------- ------")
-
-        hablar(
-            "Modo de juego. Uno, Matemáticas. Dos, Geografía. Tres, Inglés. Cuatro, Volver. Escoge una opción.",
-            lang
-        )
-
-        chosen = input("Escoge una opción: ")
-
-    categorias = {
-        "1": "math",
-        "2": "geography",
-        "3": "english"
+    payload = {
+        "player":"Anonymous",
+        "score":score
     }
 
-    if chosen in categorias:
-        categoria_seleccionada = categorias[chosen]
-        preguntas = BANCO_PREGUNTAS[categoria_seleccionada]
+    try:
 
-        for i, pregunta in enumerate(preguntas):
-            limpiar_pantalla()
+        r = requests.post(
+            API_POST,
+            json=payload,
+            timeout=5
+        )
 
-            datos_idioma = pregunta[lang]
+        return r.status_code
 
-            print(
-                f"--- {lang.upper()} - Question {i+1}/5 ---"
-                if lang == "en"
-                else f"--- {lang.upper()} - Pregunta {i+1}/5 ---"
+    except:
+        return 0
+
+# =====================================
+# BUTTON
+# =====================================
+
+class Button:
+
+    def __init__(
+        self,
+        x,
+        y,
+        w,
+        h,
+        text
+    ):
+
+        self.rect = pygame.Rect(
+            x,
+            y,
+            w,
+            h
+        )
+
+        self.text = text
+
+    def draw(self):
+
+        mouse = pygame.mouse.get_pos()
+
+        color = GRAY
+
+        if self.rect.collidepoint(mouse):
+            color = LIGHT_GRAY
+
+        pygame.draw.rect(
+            SCREEN,
+            color,
+            self.rect,
+            border_radius=12
+        )
+
+        label = FONT.render(
+            self.text,
+            True,
+            WHITE
+        )
+
+        SCREEN.blit(
+            label,
+            (
+                self.rect.centerx -
+                label.get_width()//2,
+
+                self.rect.centery -
+                label.get_height()//2
+            )
+        )
+
+    def clicked(self,event):
+
+        return (
+
+            event.type == pygame.MOUSEBUTTONDOWN
+
+            and
+
+            event.button == 1
+
+            and
+
+            self.rect.collidepoint(
+                event.pos
             )
 
-            print(f"\n{datos_idioma['q']}\n")
-            print(f"A) {datos_idioma['a']}")
-            print(f"B) {datos_idioma['b']}")
-            print(f"C) {datos_idioma['c']}")
-            print(f"D) {datos_idioma['d']}")
+        )
 
-            texto_a_leer = (
-                f"{datos_idioma['q']}. "
-                f"Option A: {datos_idioma['a']}. "
-                f"Option B: {datos_idioma['b']}. "
-                f"Option C: {datos_idioma['c']}. "
-                f"Option D: {datos_idioma['d']}."
-            )
+# =====================================
+# GAME
+# =====================================
 
-            hablar(texto_a_leer, lang)
+class Game:
 
-            hablar(
-                "Choose A, B, C or D"
-                if lang == "en"
-                else "Elige A, B, C o D",
-                lang
-            )
+    def __init__(self):
 
-            input(
-                "\nChoose A, B, C or D: "
-                if lang == "en"
-                else "\nElige A, B, C o D: "
-            )
+        self.lang = "es"
+        self.state = "menu"
 
-def main():
-    idioma_actual = "es"
+        self.score = 0
+        self.current_category = None
+        self.current_question = 0
+        self.questions = []
+        self.stats_data = None
 
-    while True:
-        estado, idioma_actual = mainscreen(idioma_actual)
+        # ========================
+        # BUTTONS (INIT ONCE)
+        # ========================
+        self.play_btn = Button(450,180,300,60,"")
+        self.settings_btn = Button(450,270,300,60,"")
+        self.stats_btn = Button(450,360,300,60,"")
+        self.quit_btn = Button(450,450,300,60,"")
 
-        if estado == "quit":
-            print("Goodbye!" if idioma_actual == "en" else "¡Adiós!")
-            hablar(
-                "Goodbye!"
-                if idioma_actual == "en"
-                else "¡Adiós!",
-                idioma_actual
-            )
-            break
+        self.lang_btn = Button(400,200,400,60,"")
+        self.blind_btn = Button(400,300,400,60,"")
+        self.back_btn = Button(400,450,400,60,"")
 
-        elif estado == "config":
-            idioma_actual = config(idioma_actual)
+        self.math_btn = Button(400,180,400,60,"")
+        self.geo_btn = Button(400,280,400,60,"")
+        self.eng_btn = Button(400,380,400,60,"")
 
-        elif estado == "game":
-            game(idioma_actual)
+        self.answerA = Button(250,250,700,60,"")
+        self.answerB = Button(250,340,700,60,"")
+        self.answerC = Button(250,430,700,60,"")
+        self.answerD = Button(250,520,700,60,"")
 
-if __name__ == "__main__":
-    main()
+        self.back_menu_btn = Button(400,500,400,60,"")
+
+    # ==========================
+    # TRANSLATION
+    # ==========================
+    def T(self, key):
+        return TEXTS[self.lang][key]
+
+    # ==========================
+    # DRAW TITLE
+    # ==========================
+    def draw_title(self):
+
+        title = FONT_BIG.render(self.T("title"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 50))
+
+    # ==========================
+    # MENU
+    # ==========================
+    def menu(self):
+
+        SCREEN.fill(BLACK)
+        self.draw_title()
+
+        self.play_btn.text = self.T("play")
+        self.settings_btn.text = self.T("settings")
+        self.stats_btn.text = self.T("stats")
+        self.quit_btn.text = self.T("quit")
+
+        self.play_btn.draw()
+        self.settings_btn.draw()
+        self.stats_btn.draw()
+        self.quit_btn.draw()
+
+    # ==========================
+    # SETTINGS
+    # ==========================
+    def settings(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("settings"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 40))
+
+        blind_text = "ON" if tts.enabled else "OFF"
+
+        self.lang_btn.text = f"{self.T('language')}: {self.lang.upper()}"
+        self.blind_btn.text = f"{self.T('blind')}: {blind_text}"
+        self.back_btn.text = self.T("back")
+
+        self.lang_btn.draw()
+        self.blind_btn.draw()
+        self.back_btn.draw()
+
+    # ==========================
+    # STATS
+    # ==========================
+    def stats(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("stats"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 40))
+
+        if self.stats_data is None:
+            self.stats_data = get_online_stats()
+
+        y = 180
+        for k, v in self.stats_data.items():
+            txt = FONT.render(f"{k}: {v}", True, WHITE)
+            SCREEN.blit(txt, (120, y))
+            y += 50
+
+        self.back_btn.text = self.T("back")
+        self.back_btn.draw()
+
+    # ==========================
+    # CATEGORY
+    # ==========================
+    def choose_category(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("play"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 40))
+
+        self.math_btn.text = self.T("math")
+        self.geo_btn.text = self.T("geo")
+        self.eng_btn.text = self.T("english")
+        self.back_btn.text = self.T("back")
+
+        self.math_btn.draw()
+        self.geo_btn.draw()
+        self.eng_btn.draw()
+        self.back_btn.draw()
+
+    # ==========================
+    # START GAME
+    # ==========================
+    def start_category(self, category):
+
+        self.current_category = category
+        self.questions = QUESTIONS[category][:]
+        random.shuffle(self.questions)
+
+        self.current_question = 0
+        self.score = 0
+
+        self.state = "question"
+        self.read_current_question()
+
+    # ==========================
+    # QUESTION SCREEN
+    # ==========================
+    def question_screen(self):
+
+        SCREEN.fill(BLACK)
+
+        qdata = self.questions[self.current_question]
+        q = qdata[self.lang]
+
+        self.answerA.text = f"A) {q['A']}"
+        self.answerB.text = f"B) {q['B']}"
+        self.answerC.text = f"C) {q['C']}"
+        self.answerD.text = f"D) {q['D']}"
+
+        title = FONT.render(
+            f"{self.current_question+1}/{len(self.questions)}",
+            True,
+            WHITE
+        )
+        SCREEN.blit(title, (50, 30))
+
+        score_text = FONT.render(
+            f"{self.T('score')}: {self.score}",
+            True,
+            GREEN
+        )
+        SCREEN.blit(score_text, (900, 30))
+
+        question = FONT.render(q["q"], True, WHITE)
+        SCREEN.blit(question, (WIDTH//2 - question.get_width()//2, 120))
+
+        self.answerA.draw()
+        self.answerB.draw()
+        self.answerC.draw()
+        self.answerD.draw()
+
+    # ==========================
+    # READ QUESTION (TTS)
+    # ==========================
+    def read_current_question(self):
+
+        if not tts.enabled:
+            return
+
+        q = self.questions[self.current_question][self.lang]
+
+        text = (
+            f"{q['q']}. "
+            f"A. {q['A']}. "
+            f"B. {q['B']}. "
+            f"C. {q['C']}. "
+            f"D. {q['D']}."
+        )
+
+        tts.speak(text)
+
+    # ==========================
+    # ANSWER CHECK
+    # ==========================
+    def answer(self, letter):
+
+        correct = self.questions[self.current_question]["correct"]
+
+        if letter == correct:
+            self.score += 1
+            tts.speak(self.T("correct"))
+        else:
+            tts.speak(self.T("wrong"))
+
+        self.current_question += 1
+
+        if self.current_question >= len(self.questions):
+            self.state = "results"
+            post_score(self.score)
+        else:
+            self.read_current_question()
+
+    # ==========================
+    # RESULTS
+    # ==========================
+    def results(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("finalscore"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 120))
+
+        result = FONT_BIG.render(
+            f"{self.score}/{len(self.questions)}",
+            True,
+            GREEN
+        )
+        SCREEN.blit(result, (WIDTH//2 - result.get_width()//2, 250))
+
+        percent = int(self.score / len(self.questions) * 100)
+
+        ptxt = FONT.render(f"{percent}%", True, WHITE)
+        SCREEN.blit(ptxt, (WIDTH//2 - ptxt.get_width()//2, 350))
+
+        self.back_menu_btn.text = self.T("back")
+        self.back_menu_btn.draw()
+
+    # ==========================
+    # EVENTS
+    # ==========================
+    def handle_event(self, event):
+
+        if self.state == "menu":
+
+            if self.play_btn.clicked(event):
+                self.state = "category"
+
+            elif self.settings_btn.clicked(event):
+                self.state = "settings"
+
+            elif self.stats_btn.clicked(event):
+                self.stats_data = get_online_stats()
+                self.state = "stats"
+
+            elif self.quit_btn.clicked(event):
+                pygame.quit()
+                sys.exit()
+
+        elif self.state == "settings":
+
+            if self.lang_btn.clicked(event):
+
+                self.lang = "en" if self.lang == "es" else "es"
+                tts.set_language(self.lang)
+
+            elif self.blind_btn.clicked(event):
+
+                tts.enabled = not tts.enabled
+                if tts.enabled:
+                    tts.set_language(self.lang)
+
+            elif self.back_btn.clicked(event):
+                self.state = "menu"
+
+        elif self.state == "stats":
+
+            if self.back_btn.clicked(event):
+                self.state = "menu"
+
+        elif self.state == "category":
+
+            if self.math_btn.clicked(event):
+                self.start_category("math")
+
+            elif self.geo_btn.clicked(event):
+                self.start_category("geo")
+
+            elif self.eng_btn.clicked(event):
+                self.start_category("english")
+
+            elif self.back_btn.clicked(event):
+                self.state = "menu"
+
+        elif self.state == "question":
+
+            if self.answerA.clicked(event):
+                self.answer("A")
+            elif self.answerB.clicked(event):
+                self.answer("B")
+            elif self.answerC.clicked(event):
+                self.answer("C")
+            elif self.answerD.clicked(event):
+                self.answer("D")
+
+        elif self.state == "results":
+
+            if self.back_menu_btn.clicked(event):
+                self.state = "menu"
+
+    # ==========================
+    # DRAW ROUTER
+    # ==========================s
+    def draw(self):
+
+        if self.state == "menu":
+            self.menu()
+
+        elif self.state == "settings":
+            self.settings()
+
+        elif self.state == "stats":
+            self.stats()
+
+        elif self.state == "category":
+            self.choose_category()
+
+        elif self.state == "question":
+            self.question_screen()
+
+        elif self.state == "results":
+            self.results()
+
+    def __init__(self):
+
+        self.lang = "es"
+        self.state = "menu"
+
+        self.score = 0
+        self.current_category = None
+        self.current_question = 0
+        self.questions = []
+        self.stats_data = None
+
+        # ========================
+        # BUTTONS (INIT ONCE)
+        # ========================
+        self.play_btn = Button(450,180,300,60,"")
+        self.settings_btn = Button(450,270,300,60,"")
+        self.stats_btn = Button(450,360,300,60,"")
+        self.quit_btn = Button(450,450,300,60,"")
+
+        self.lang_btn = Button(400,200,400,60,"")
+        self.blind_btn = Button(400,300,400,60,"")
+        self.back_btn = Button(400,450,400,60,"")
+
+        self.math_btn = Button(400,180,400,60,"")
+        self.geo_btn = Button(400,280,400,60,"")
+        self.eng_btn = Button(400,380,400,60,"")
+
+        self.answerA = Button(250,250,700,60,"")
+        self.answerB = Button(250,340,700,60,"")
+        self.answerC = Button(250,430,700,60,"")
+        self.answerD = Button(250,520,700,60,"")
+
+        self.back_menu_btn = Button(400,500,400,60,"")
+
+    # ==========================
+    # TRANSLATION
+    # ==========================
+    def T(self,key):
+        return TEXTS[self.lang][key]
+
+    # ==========================
+    # MENU
+    # ==========================
+    def menu(self):
+
+        SCREEN.fill(BLACK)
+        self.draw_title()
+
+        self.play_btn.text = self.T("play")
+        self.settings_btn.text = self.T("settings")
+        self.stats_btn.text = self.T("stats")
+        self.quit_btn.text = self.T("quit")
+
+        self.play_btn.draw()
+        self.settings_btn.draw()
+        self.stats_btn.draw()
+        self.quit_btn.draw()
+
+    # ==========================
+    # SETTINGS
+    # ==========================
+    def settings(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("settings"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 40))
+
+        blind_text = "ON" if tts.enabled else "OFF"
+
+        self.lang_btn.text = f"{self.T('language')}: {self.lang.upper()}"
+        self.blind_btn.text = f"{self.T('blind')}: {blind_text}"
+        self.back_btn.text = self.T("back")
+
+        self.lang_btn.draw()
+        self.blind_btn.draw()
+        self.back_btn.draw()
+
+def handle_event(self, event):
+
+    if self.state == "menu":
+
+        if self.play_btn.clicked(event):
+            self.state = "category"
+
+        elif self.settings_btn.clicked(event):
+            self.state = "settings"
+
+        elif self.stats_btn.clicked(event):
+            self.stats_data = get_online_stats()
+            self.state = "stats"
+
+        elif self.quit_btn.clicked(event):
+            pygame.quit()
+            sys.exit()
+
+    elif self.state == "settings":
+
+        if self.lang_btn.clicked(event):
+
+            self.lang = "en" if self.lang == "es" else "es"
+            tts.set_language(self.lang)
+
+        elif self.blind_btn.clicked(event):
+
+            tts.enabled = not tts.enabled
+            if tts.enabled:
+                tts.set_language(self.lang)
+
+        elif self.back_btn.clicked(event):
+            self.state = "menu"
+
+    elif self.state == "stats":
+
+        if self.back_btn.clicked(event):
+            self.state = "menu"
+
+    elif self.state == "category":
+
+        if self.math_btn.clicked(event):
+            self.start_category("math")
+
+        elif self.geo_btn.clicked(event):
+            self.start_category("geo")
+
+        elif self.eng_btn.clicked(event):
+            self.start_category("english")
+
+        elif self.back_btn.clicked(event):
+            self.state = "menu"
+
+    elif self.state == "question":
+
+        if self.answerA.clicked(event):
+            self.answer("A")
+        elif self.answerB.clicked(event):
+            self.answer("B")
+        elif self.answerC.clicked(event):
+            self.answer("C")
+        elif self.answerD.clicked(event):
+            self.answer("D")
+
+    elif self.state == "results":
+
+        if self.back_menu_btn.clicked(event):
+            self.state = "menu"
+
+    # ==========================
+    # STATS
+    # ==========================
+    def stats(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("stats"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 40))
+
+        if self.stats_data is None:
+            self.stats_data = get_online_stats()
+
+        y = 180
+        for k,v in self.stats_data.items():
+            txt = FONT.render(f"{k}: {v}", True, WHITE)
+            SCREEN.blit(txt,(120,y))
+            y += 50
+
+        self.back_btn.text = self.T("back")
+        self.back_btn.draw()
+
+    # ==========================
+    # CATEGORY
+    # ==========================
+    def choose_category(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("play"), True, WHITE)
+        SCREEN.blit(title, (WIDTH//2 - title.get_width()//2, 40))
+
+        self.math_btn.text = self.T("math")
+        self.geo_btn.text = self.T("geo")
+        self.eng_btn.text = self.T("english")
+        self.back_btn.text = self.T("back")
+
+        self.math_btn.draw()
+        self.geo_btn.draw()
+        self.eng_btn.draw()
+        self.back_btn.draw()
+
+    # ==========================
+    # GAME START
+    # ==========================
+    def start_category(self, category):
+
+        self.current_category = category
+        self.questions = QUESTIONS[category][:]
+        random.shuffle(self.questions)
+
+        self.current_question = 0
+        self.score = 0
+
+        self.state = "question"
+        self.read_current_question()
+
+    # ==========================
+    # QUESTION
+    # ==========================
+    def question_screen(self):
+
+        SCREEN.fill(BLACK)
+
+        qdata = self.questions[self.current_question]
+        q = qdata[self.lang]
+
+        self.answerA.text = f"A) {q['A']}"
+        self.answerB.text = f"B) {q['B']}"
+        self.answerC.text = f"C) {q['C']}"
+        self.answerD.text = f"D) {q['D']}"
+
+        title = FONT.render(f"{self.current_question+1}/{len(self.questions)}", True, WHITE)
+        SCREEN.blit(title,(50,30))
+
+        score_text = FONT.render(f"{self.T('score')}: {self.score}", True, GREEN)
+        SCREEN.blit(score_text,(900,30))
+
+        question = FONT.render(q["q"], True, WHITE)
+        SCREEN.blit(question,(WIDTH//2 - question.get_width()//2,120))
+
+        self.answerA.draw()
+        self.answerB.draw()
+        self.answerC.draw()
+        self.answerD.draw()
+
+    # ==========================
+    # ANSWER CHECK
+    # ==========================
+    def answer(self, letter):
+
+        correct = self.questions[self.current_question]["correct"]
+
+        if letter == correct:
+            self.score += 1
+            tts.speak(self.T("correct"))
+        else:
+            tts.speak(self.T("wrong"))
+
+        self.current_question += 1
+
+        if self.current_question >= len(self.questions):
+            self.state = "results"
+            post_score(self.score)
+        else:
+            self.read_current_question()
+
+    # ==========================
+    # RESULTS
+    # ==========================
+    def results(self):
+
+        SCREEN.fill(BLACK)
+
+        title = FONT_BIG.render(self.T("finalscore"), True, WHITE)
+        SCREEN.blit(title,(WIDTH//2 - title.get_width()//2,120))
+
+        result = FONT_BIG.render(f"{self.score}/{len(self.questions)}", True, GREEN)
+        SCREEN.blit(result,(WIDTH//2 - result.get_width()//2,250))
+
+        percent = int(self.score/len(self.questions)*100)
+
+        ptxt = FONT.render(f"{percent}%", True, WHITE)
+        SCREEN.blit(ptxt,(WIDTH//2 - ptxt.get_width()//2,350))
+
+        self.back_menu_btn.text = self.T("back")
+        self.back_menu_btn.draw()
+
+
+# =====================================
+# MAIN
+# =====================================
+
+game = Game()
+
+tts.set_language("es")
+
+while True:
+
+    CLOCK.tick(60)
+
+    for event in pygame.event.get():
+
+        if event.type == pygame.QUIT:
+
+            pygame.quit()
+            sys.exit()
+
+        game.handle_event(event)
+
+    game.draw()
+
+    pygame.display.flip()

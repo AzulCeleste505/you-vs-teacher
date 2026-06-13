@@ -1,1 +1,1 @@
-# you-vs-teacher
+# You VS Teacher
